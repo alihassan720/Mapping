@@ -1,0 +1,32 @@
+library(tidyverse)
+library(camcorder)
+library(scico)
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(tigris)
+
+# Read in drought data
+drought_fips <- readxl::read_xlsx("willdfire_climate_data.xlsx")
+us <- sf::read_sf("gadm36_CHN_1.shp")
+# Calculate mean DCSI by year and month, filter > 2012
+month_fips <- drought_fips %>% 
+  group_by(year, month, lat, lon) %>% 
+  summarise(carbon = mean(fire.carbon))
+# Combine with shapefile
+fips_us <- us %>% 
+  right_join(month_fips)
+# Create US outline and combine with years and months
+ym <- month_fips %>% 
+  distinct(year, month)
+
+us_outline <- sf::st_union(us) %>% 
+  as.data.frame() %>% 
+  bind_cols(ym) 
+
+ggplot(fips_us) +
+  geom_sf(aes(fill = carbon, geometry = geometry), color = NA) +
+  geom_sf(data = us_outline, aes(geometry = geometry), fill = NA, size = 0.25) +
+  scale_fill_scico(palette = "bilbao") +
+  facet_grid(vars(month))
+ggsave(filename = "Carbon2.png")
